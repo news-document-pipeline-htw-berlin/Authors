@@ -1,0 +1,56 @@
+import authorMapping.Authors
+import db.DBConnector
+import org.apache.spark.sql.{DataFrame, SparkSession}
+
+object App {
+
+  def joinDataFrames(frame1: DataFrame, frame2: DataFrame): DataFrame = {
+    frame1.join(frame2, Seq("_id"))
+  }
+
+
+  def main(args: Array[String]): Unit = {
+
+    val inputUri = DBConnector.createUri("127.0.0.1", "artikel", "artikelcollection")
+    val outputUri = DBConnector.createUri("127.0.0.1", "test", "authors")
+
+    val spark = SparkSession.builder()
+      .master("local[4]")
+      .appName("Authoranalysis")
+      .config("spark.mongodb.input.uri", inputUri)
+      .config("spark.mongodb.output.uri", outputUri)
+      .config("spark.executor.memory", "6g")
+      .config("spark.storage.memoryFraction", "0.8")
+      .config("spark.driver.memory", "2g")
+      .getOrCreate()
+
+    val readConfig = DBConnector.createReadConfig(inputUri, spark)
+    val writeConfig = DBConnector.createWriteConfig(outputUri,sparkSession = spark)
+    val mongoData = DBConnector.readFromDB(sparkSession = spark, readConfig = readConfig)
+
+
+    val groupedAuthors = Authors.GroupByAuthorRDDRow(mongoData)
+    val publishedOnDay = Authors.PublishedOnDayRDD(groupedAuthors)
+    val perWebsite = Authors.AmountOfArticlesByWebsiteRDD(groupedAuthors)
+    val averageWordsPerArticle = Authors.AverageWordsPerArticleRDD(groupedAuthors)
+    val amountOfArticles = Authors.AmountOfArticlesPerAuthor(groupedAuthors)
+
+
+    // Creation of Dataframes
+    val articles = spark.createDataFrame(amountOfArticles.collect()).toDF("_id", "articles")
+    val averageWords = spark.createDataFrame(averageWordsPerArticle.collect()).toDF("_id", "averageWords")
+    val daysPublished = spark.createDataFrame(publishedOnDay.collect()).toDF("_id", "daysPublished")
+    val perWebsiteDF = spark.createDataFrame(perWebsite.collect()).toDF("_id", "perWebsite")
+
+    // joining Dataframes
+    val joinedArticles = joinDataFrames(articles, averageWords)
+    val joinedPublishedWebsite = joinDataFrames(daysPublished, perWebsiteDF)
+    val fullDataFrame = joinDataFrames(joinedArticles, joinedPublishedWebsite)
+
+    // save to MongoDB
+    DBConnector.writeToDB(fullDataFrame, writeConfig = writeConfig)
+
+
+  }
+
+}
