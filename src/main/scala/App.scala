@@ -29,11 +29,11 @@ object App {
     val mongoData = DBConnector.readFromDB(sparkSession = spark, readConfig = readConfig)
 
 
-    val groupedAuthors = Authors.GroupByAuthorRDDRow(mongoData)
-    val publishedOnDay = Authors.PublishedOnDayRDD(groupedAuthors)
-    val perWebsite = Authors.AmountOfArticlesByWebsiteRDD(groupedAuthors)
-    val averageWordsPerArticle = Authors.AverageWordsPerArticleRDD(groupedAuthors)
-    val amountOfArticles = Authors.AmountOfArticlesPerAuthor(groupedAuthors)
+    val groupedAuthors = Authors.groupByAuthorRDDRow(mongoData)
+    val publishedOnDay = Authors.publishedOnDayRDD(groupedAuthors)
+    val perWebsite = Authors.amountOfArticlesByWebsiteRDD(groupedAuthors)
+    val averageWordsPerArticle = Authors.averageWordsPerArticleRDD(groupedAuthors)
+    val amountOfArticles = Authors.amountOfArticlesPerAuthor(groupedAuthors)
 
 
     // Creation of Dataframes
