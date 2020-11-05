@@ -12,8 +12,7 @@ object Authors {
 
 
   def groupByAuthorRDDRow(data: RDD[Row]): RDD[(String, List[(String, Any, String)])] = {
-    data.flatMap(x => x.getAs[mutable.WrappedArray[String]](1).toList.map(y => (y, (x.getString(15), x.get(13), x.getString(12))))).groupByKey().map(x => (x._1, x._2.toList))
-
+    data.flatMap(x => x.getAs[mutable.WrappedArray[String]](1).toList.map(y => (y, (x.getString(15), if(x.get(13) != null) x.get(13) else x.get(2), x.getString(12))))).groupByKey().map(x => (x._1, (x._2).toList))
   }
 
   def amountOfArticlesPerAuthor(data: RDD[(String, List[(String, Any, String)])]): RDD[(String, Double)] = {
