@@ -31,18 +31,20 @@ object App {
     val perWebsite = Authors.amountOfArticlesByWebsiteRDD(groupedAuthors)
     val averageWordsPerArticle = Authors.averageWordsPerArticleRDD(groupedAuthors)
     val amountOfArticles = Authors.amountOfArticlesPerAuthor(groupedAuthors)
-
+    val perDepartment = Authors.articlesPerDepartment(mongoData)
 
     // Creation of Dataframes
     val articles = spark.createDataFrame(amountOfArticles.collect()).toDF("_id", "articles")
     val averageWords = spark.createDataFrame(averageWordsPerArticle.collect()).toDF("_id", "averageWords")
     val daysPublished = spark.createDataFrame(publishedOnDay.collect()).toDF("_id", "daysPublished")
     val perWebsiteDF = spark.createDataFrame(perWebsite.collect()).toDF("_id", "perWebsite")
+    val perDepartmentDF = spark.createDataFrame(perDepartment.collect()).toDF("_id", "perDepartment")
 
     // joining Dataframes
     val joinedArticles = joinDataFrames(articles, averageWords)
     val joinedPublishedWebsite = joinDataFrames(daysPublished, perWebsiteDF)
-    val fullDataFrame = joinDataFrames(joinedArticles, joinedPublishedWebsite)
+    val joinedPublishedDepartment = joinDataFrames(joinedPublishedWebsite, perDepartmentDF)
+    val fullDataFrame = joinDataFrames(joinedArticles, joinedPublishedDepartment)
 
     // save to MongoDB
     DBConnector.writeToDB(fullDataFrame, writeConfig = writeConfig)
