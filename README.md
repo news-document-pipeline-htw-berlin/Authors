@@ -7,7 +7,7 @@
 > git clone https://github.com/news-document-pipeline-htw-berlin/Authors \
 > cd Authors\
 > Edit inputUri and outputUri in App\
-> Make sure input MongoDB is structured according to cheat sheet
+> Make sure input MongoDB is structured according to cheat sheet \
 > sbt run
 
 # MongoDB Cheat sheet
