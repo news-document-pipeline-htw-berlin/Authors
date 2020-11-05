@@ -10,26 +10,50 @@ import scala.collection.mutable
 
 object Authors {
 
+  /*
+     Aggregates every entry to a Map with (key,value) => (Author, (Text,Date,Website))
+     If no published date is provided, crawl time will be used instead
+  */
 
   def groupByAuthorRDDRow(data: RDD[Row]): RDD[(String, List[(String, Any, String)])] = {
     data.flatMap(x => x.getAs[mutable.WrappedArray[String]](1).toList.map(y => (y, (x.getString(15), if (x.get(13) != null) x.get(13) else x.get(2), x.getString(12))))).groupByKey().map(x => (x._1, x._2.toList))
   }
+
+
+  /*
+     Maps every author to the amount of articles they've written (which are in db)
+     e.g. (Anna Krueger, 20)
+  */
 
   def amountOfArticlesPerAuthor(data: RDD[(String, List[(String, Any, String)])]): RDD[(String, Double)] = {
     data.map(x => (x._1, x._2.size))
 
   }
 
+  /*
+     Maps every author to his average amount of words per article
+     e.g Map (Anna Krueger -> 306.66)
+  */
 
   def averageWordsPerArticleRDD(data: RDD[(String, List[(String, Any, String)])]): RDD[(String, Double)] = {
     data.map(x => (x._1, x._2.map(y => y._1.split(" ").length.toDouble / x._2.size).sum))
 
   }
 
+  /*
+    Maps the author to another map with (key,value) => (news_page, amount of times published on news_page)
+    e.g. Map(Anna Krueger -> Map(sz -> 22, taz -> 3))
+  */
+
   def amountOfArticlesByWebsiteRDD(data: RDD[(String, List[(String, Any, String)])]): RDD[(String, Map[String, Int])] = {
     data.map(x => (x._1, x._2.map(y => (y._3, x._2.count(_._3 == y._3))).toMap))
 
   }
+
+  /*
+      Maps every Author to another Map with (key,value) => (Day the article was published, amount of times an article was published on this day)
+      e.g. Map[Anna Krueger -> Map(Thu -> 2, Fri -> 5)]
+  */
 
   def publishedOnDayRDD(data: RDD[(String, List[(String, Any, String)])]): RDD[(String, Map[String, Int])] = {
     val formatter = new SimpleDateFormat("EEEE", Locale.ENGLISH)
@@ -40,9 +64,14 @@ object Authors {
 
   }
 
-  def articlesPerDepartment(data: RDD[Row]): RDD[(String, Map[String,Int])] = {
+  /*
+        Maps every Author to another Map with (key,value) => (Name of category, amount of times an article was published in this category)
+        e.g. Map[Anna Krueger -> Map(Wissen -> 25, Reisen -> 2)]
+  */
+
+  def articlesPerDepartment(data: RDD[Row]): RDD[(String, Map[String, Int])] = {
     val x = data.flatMap(x => x.getAs[mutable.WrappedArray[String]](1).toList.map(y => (y, x.getAs[mutable.WrappedArray[String]](3).toList))).groupByKey()
-    x.map(y => (y._1, y._2.flatten.map(z => (z,y._2.flatten.count(_ == z))).toMap))
+    x.map(y => (y._1, y._2.flatten.map(z => (z, y._2.flatten.count(_ == z))).toMap))
   }
 
 
