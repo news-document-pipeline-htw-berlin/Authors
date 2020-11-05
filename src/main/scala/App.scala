@@ -16,19 +16,16 @@ object App {
 
     val spark = SparkSession.builder()
       .master("local[4]")
-      .appName("Authoranalysis")
+      .appName("Author analysis")
       .config("spark.mongodb.input.uri", inputUri)
       .config("spark.mongodb.output.uri", outputUri)
-      .config("spark.executor.memory", "6g")
-      .config("spark.storage.memoryFraction", "0.8")
-      .config("spark.driver.memory", "2g")
       .getOrCreate()
 
     val readConfig = DBConnector.createReadConfig(inputUri, spark)
-    val writeConfig = DBConnector.createWriteConfig(outputUri,sparkSession = spark)
+    val writeConfig = DBConnector.createWriteConfig(outputUri, sparkSession = spark)
     val mongoData = DBConnector.readFromDB(sparkSession = spark, readConfig = readConfig)
 
-
+    // Mapping elements
     val groupedAuthors = Authors.groupByAuthorRDDRow(mongoData)
     val publishedOnDay = Authors.publishedOnDayRDD(groupedAuthors)
     val perWebsite = Authors.amountOfArticlesByWebsiteRDD(groupedAuthors)
