@@ -36,7 +36,7 @@ object Authors {
   */
 
   def averageWordsPerArticleRDD(data: RDD[(String, List[(String, Any, String, String, List[String])])]): RDD[(String, Double)] = {
-    data.map(x => (x._1, x._2.map(y => y._1.split(" ").length.toDouble / x._2.size).sum))
+    data.map(x => (x._1, x._2.map(y => y._1.replace(",","").split(" ").length.toDouble / x._2.size).sum))
 
   }
 
