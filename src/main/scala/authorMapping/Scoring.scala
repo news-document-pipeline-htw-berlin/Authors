@@ -31,8 +31,6 @@ object Scoring {
 
     val avgArticles = sparkSession.createDataFrame(amountOfArticles.collect()).toDF("_id", "avgArticles")
     val data = avgArticles.join(scoreDataFrame, Seq("_id")).rdd
-    print(averageArticles)
-    print(maxArticles)
     val processedScore = data.map(x => (x(0).toString,
       if (x.getDouble(1) < averageArticles){ if(x.getDouble(2) - 10 < 0) 0.0 else x.getDouble(2) - 10  }
       else if (x.getDouble(1) > averageArticles){ if(x.getDouble(2) + 10 > 100) 100.0 else x.getDouble(2) + 10 }

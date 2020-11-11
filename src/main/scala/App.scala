@@ -14,6 +14,7 @@ object App {
     val inputUri = DBConnector.createUri("127.0.0.1", "artikel", "artikelcollection")
     val outputUri = DBConnector.createUri("127.0.0.1", "test", "authors")
 
+
     val spark = SparkSession.builder()
       .master("local[4]")
       .appName("Author analysis")
@@ -21,9 +22,11 @@ object App {
       .config("spark.mongodb.output.uri", outputUri)
       .getOrCreate()
 
+
     val readConfig = DBConnector.createReadConfig(inputUri, spark)
     val writeConfig = DBConnector.createWriteConfig(outputUri, sparkSession = spark)
     val mongoData = DBConnector.readFromDB(sparkSession = spark, readConfig = readConfig)
+
 
     // Mapping elements
     val groupedAuthors = Authors.groupByAuthorRDDRow(mongoData)
@@ -32,7 +35,7 @@ object App {
     val perWebsite = Authors.amountOfArticlesByWebsiteRDD(groupedAuthors)
     val averageWordsPerArticle = Authors.averageWordsPerArticleRDD(groupedAuthors)
     val amountOfArticles = Authors.amountOfArticlesPerAuthor(groupedAuthors)
-    val perDepartment = Authors.articlesPerDepartment(mongoData)
+    val perDepartment = Authors.articlesPerDepartment(groupedAuthors)
 
 
     // Creation of Dataframes
@@ -42,7 +45,6 @@ object App {
     val perWebsiteDF = spark.createDataFrame(perWebsite.collect()).toDF("_id", "perWebsite")
     val perDepartmentDF = spark.createDataFrame(perDepartment.collect()).toDF("_id", "perDepartment")
     val amountSourceDF = spark.createDataFrame(amountOfSourcesPerAuthor.collect()).toDF("_id", "avgAmountOfSources")
-
 
 
     // Trust score for authors
