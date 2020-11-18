@@ -1,6 +1,7 @@
 import authorMapping.{Authors, Scoring}
 import db.DBConnector
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import scala.io.Source
 
 object App {
 
@@ -8,11 +9,32 @@ object App {
     frame1.join(frame2, Seq("_id"))
   }
 
+  def getConnectionInfoFromFile(pathToFile: String): Map[String, String] = {
+    val bufferedSource = scala.io.Source.fromFile(pathToFile)
+
+    val map = bufferedSource.mkString // turn it into one long String
+      .split("(?=\\n\\S+\\s*->)") // a non-consuming split
+      .map(_.trim.split("\\s*->\\s*")) // split each element at "->"
+      .map(arr => arr(0) -> arr(1)) // from 2-element Array to tuple
+      .toMap
+    bufferedSource.close()
+
+    map
+  }
+
 
   def main(args: Array[String]): Unit = {
 
-    val inputUri = DBConnector.createUri("127.0.0.1", "artikel", "artikelcollection")
-    val outputUri = DBConnector.createUri("127.0.0.1", "test", "authors")
+    val inputMap = getConnectionInfoFromFile("src/main/ressources/inputDBSettings")
+    val outputMap = getConnectionInfoFromFile("src/main/ressources/outputDBSettings")
+
+    val inputUri = DBConnector.createUri(inputMap.getOrElse("inputUri", throw new IllegalArgumentException),
+      inputMap.getOrElse("inputDB", throw new IllegalArgumentException),
+      inputMap.getOrElse("inputCollection", throw new IllegalArgumentException))
+
+    val outputUri = DBConnector.createUri(outputMap.getOrElse("outputUri", throw new IllegalArgumentException),
+      outputMap.getOrElse("outputDB", throw new IllegalArgumentException),
+      outputMap.getOrElse("outputCollection", throw new IllegalArgumentException))
 
 
     val spark = SparkSession.builder()
@@ -60,6 +82,7 @@ object App {
     val joinedSourcePublished = joinDataFrames(joinedPublishedDepartment, amountSourceDF)
     val joinedScorePublished = joinDataFrames(scoreAfterAmountOfArticles, joinedSourcePublished)
     val fullDataFrame = joinDataFrames(joinedArticles, joinedScorePublished)
+
 
     // save to MongoDB
     DBConnector.writeToDB(fullDataFrame, writeConfig = writeConfig)
