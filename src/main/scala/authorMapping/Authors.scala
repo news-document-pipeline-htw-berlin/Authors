@@ -74,6 +74,10 @@ object Authors {
     data.map(x => (x._1, x._2.map(_._6))).map(x => (x._1, x._2.flatten.map(z => (z, x._2.flatten.count(_ == z))).toMap))
   }
 
+  /*
+    Maps every Authors to its average amount of sources used over all articles
+    e.g Map[Anna Krueger -> 1.61]
+   */
 
   def authorWithArticleAndSource(data: RDD[(String, List[(String, Any, String, String, List[String], List[String])])]): RDD[(String, Double)] = {
     data.map(x => (x._1, x._2.map(y => y._5.size.toDouble / x._2.size).sum))

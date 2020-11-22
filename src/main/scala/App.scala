@@ -1,14 +1,21 @@
 import authorMapping.{Authors, Scoring}
 import db.DBConnector
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import scala.io.Source
+
 
 object App {
 
+  /*
+    Helper method to join dataframes on their id
+   */
   def joinDataFrames(frame1: DataFrame, frame2: DataFrame): DataFrame = {
     frame1.join(frame2, Seq("_id"))
   }
 
+
+  /*
+    Reads connection settings from db files in resources
+   */
   def getConnectionInfoFromFile(pathToFile: String): Map[String, String] = {
     val bufferedSource = scala.io.Source.fromFile(pathToFile)
 
@@ -25,8 +32,8 @@ object App {
 
   def main(args: Array[String]): Unit = {
 
-    val inputMap = getConnectionInfoFromFile("src/main/ressources/inputDBSettings")
-    val outputMap = getConnectionInfoFromFile("src/main/ressources/outputDBSettings")
+    val inputMap = getConnectionInfoFromFile("src/main/resources/inputDBSettings")
+    val outputMap = getConnectionInfoFromFile("src/main/resources/outputDBSettings")
 
     val inputUri = DBConnector.createUri(inputMap.getOrElse("inputUri", throw new IllegalArgumentException),
       inputMap.getOrElse("inputDB", throw new IllegalArgumentException),
@@ -49,9 +56,8 @@ object App {
     val writeConfig = DBConnector.createWriteConfig(outputUri, sparkSession = spark)
     val mongoData = DBConnector.readFromDB(sparkSession = spark, readConfig = readConfig)
 
-
     // Mapping elements
-    val groupedAuthors = Authors.groupByAuthorRDDRow(mongoData)
+    val groupedAuthors = Authors.groupByAuthorRDDRow(mongoData).cache()
     val amountOfSourcesPerAuthor = Authors.authorWithArticleAndSource(groupedAuthors)
     val publishedOnDay = Authors.publishedOnDayRDD(groupedAuthors)
     val perWebsite = Authors.amountOfArticlesByWebsiteRDD(groupedAuthors)
@@ -87,7 +93,5 @@ object App {
     // save to MongoDB
     DBConnector.writeToDB(fullDataFrame, writeConfig = writeConfig)
 
-
   }
-
 }
