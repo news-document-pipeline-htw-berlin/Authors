@@ -2,20 +2,19 @@ import authorMapping.{Authors, Scoring}
 import db.DBConnector
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-
 object App {
 
   /*
-    Helper method to join dataframes on their id
-   */
+   Joins two SQL Dataframes by column _id
+  */
   def joinDataFrames(frame1: DataFrame, frame2: DataFrame): DataFrame = {
     frame1.join(frame2, Seq("_id"))
   }
 
-
   /*
-    Reads connection settings from db files in resources
-   */
+   Reads connection settings from db files in resources
+  */
+
   def getConnectionInfoFromFile(pathToFile: String): Map[String, String] = {
     val bufferedSource = scala.io.Source.fromFile(pathToFile)
 
@@ -31,7 +30,6 @@ object App {
 
 
   def main(args: Array[String]): Unit = {
-
     val inputMap = getConnectionInfoFromFile("src/main/resources/inputDBSettings")
     val outputMap = getConnectionInfoFromFile("src/main/resources/outputDBSettings")
 
@@ -57,8 +55,8 @@ object App {
     val mongoData = DBConnector.readFromDB(sparkSession = spark, readConfig = readConfig)
 
     // Mapping elements
-    val groupedAuthors = Authors.groupByAuthorRDDRow(mongoData).cache()
-    val amountOfSourcesPerAuthor = Authors.authorWithArticleAndSource(groupedAuthors)
+    val groupedAuthors = Authors.groupByAuthorRDDRow(mongoData)
+    val amountOfSourcesPerAuthor = Authors.averageSourcesPerAuthor(groupedAuthors)
     val publishedOnDay = Authors.publishedOnDayRDD(groupedAuthors)
     val perWebsite = Authors.amountOfArticlesByWebsiteRDD(groupedAuthors)
     val averageWordsPerArticle = Authors.averageWordsPerArticleRDD(groupedAuthors)
@@ -76,9 +74,9 @@ object App {
 
 
     // Trust score for authors
-    val defaultScore = Scoring.giveAuthorDefaultScore(groupedAuthors.map(x => x._1), spark).toDF("_id", "score")
-    val scoreAfterSources = Scoring.reduceScoreByAmountOfLinks(defaultScore, amountSourceDF, spark)
-    val scoreAfterAmountOfArticles = Scoring.reduceByAmountOfArticles(scoreAfterSources, amountOfArticles, spark)
+    //val defaultScore = Scoring.giveAuthorDefaultScore(groupedAuthors.map(x => x._1), spark).toDF("_id", "score")
+    //val scoreAfterSources = Scoring.reduceScoreByAmountOfLinks(defaultScore, amountSourceDF, spark)
+    //val scoreAfterAmountOfArticles = Scoring.reduceByAmountOfArticles(scoreAfterSources, amountOfArticles, spark)
 
 
     // joining Dataframes
@@ -86,12 +84,10 @@ object App {
     val joinedPublishedWebsite = joinDataFrames(daysPublished, perWebsiteDF)
     val joinedPublishedDepartment = joinDataFrames(joinedPublishedWebsite, perDepartmentDF)
     val joinedSourcePublished = joinDataFrames(joinedPublishedDepartment, amountSourceDF)
-    val joinedScorePublished = joinDataFrames(scoreAfterAmountOfArticles, joinedSourcePublished)
-    val fullDataFrame = joinDataFrames(joinedArticles, joinedScorePublished)
-
+    //val joinedScorePublished = joinDataFrames(scoreAfterAmountOfArticles, joinedSourcePublished)
+    val fullDataFrame = joinDataFrames(joinedArticles, joinedSourcePublished)
 
     // save to MongoDB
     DBConnector.writeToDB(fullDataFrame, writeConfig = writeConfig)
-
   }
 }
