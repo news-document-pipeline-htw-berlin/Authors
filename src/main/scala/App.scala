@@ -4,15 +4,42 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object App {
 
+  /*
+   Joins two SQL Dataframes by column _id
+  */
   def joinDataFrames(frame1: DataFrame, frame2: DataFrame): DataFrame = {
     frame1.join(frame2, Seq("_id"))
   }
 
+  /*
+   Reads connection settings from db files in resources
+  */
+
+  def getConnectionInfoFromFile(pathToFile: String): Map[String, String] = {
+    val bufferedSource = scala.io.Source.fromFile(pathToFile)
+
+    val map = bufferedSource.mkString // turn it into one long String
+      .split("(?=\\n\\S+\\s*->)") // a non-consuming split
+      .map(_.trim.split("\\s*->\\s*")) // split each element at "->"
+      .map(arr => arr(0) -> arr(1)) // from 2-element Array to tuple
+      .toMap
+    bufferedSource.close()
+
+    map
+  }
+
 
   def main(args: Array[String]): Unit = {
+    val inputMap = getConnectionInfoFromFile("src/main/resources/inputDBSettings")
+    val outputMap = getConnectionInfoFromFile("src/main/resources/outputDBSettings")
 
-    val inputUri = DBConnector.createUri("127.0.0.1", "artikel", "artikelcollection")
-    val outputUri = DBConnector.createUri("127.0.0.1", "test", "authors")
+    val inputUri = DBConnector.createUri(inputMap.getOrElse("inputUri", throw new IllegalArgumentException),
+      inputMap.getOrElse("inputDB", throw new IllegalArgumentException),
+      inputMap.getOrElse("inputCollection", throw new IllegalArgumentException))
+
+    val outputUri = DBConnector.createUri(outputMap.getOrElse("outputUri", throw new IllegalArgumentException),
+      outputMap.getOrElse("outputDB", throw new IllegalArgumentException),
+      outputMap.getOrElse("outputCollection", throw new IllegalArgumentException))
 
 
     val spark = SparkSession.builder()
@@ -27,10 +54,9 @@ object App {
     val writeConfig = DBConnector.createWriteConfig(outputUri, sparkSession = spark)
     val mongoData = DBConnector.readFromDB(sparkSession = spark, readConfig = readConfig)
 
-
     // Mapping elements
     val groupedAuthors = Authors.groupByAuthorRDDRow(mongoData)
-    val amountOfSourcesPerAuthor = Authors.authorWithArticleAndSource(groupedAuthors)
+    val amountOfSourcesPerAuthor = Authors.averageSourcesPerAuthor(groupedAuthors)
     val publishedOnDay = Authors.publishedOnDayRDD(groupedAuthors)
     val perWebsite = Authors.amountOfArticlesByWebsiteRDD(groupedAuthors)
     val averageWordsPerArticle = Authors.averageWordsPerArticleRDD(groupedAuthors)
@@ -48,9 +74,9 @@ object App {
 
 
     // Trust score for authors
-    val defaultScore = Scoring.giveAuthorDefaultScore(groupedAuthors.map(x => x._1), spark).toDF("_id", "score")
-    val scoreAfterSources = Scoring.reduceScoreByAmountOfLinks(defaultScore, amountSourceDF, spark)
-    val scoreAfterAmountOfArticles = Scoring.reduceByAmountOfArticles(scoreAfterSources, amountOfArticles, spark)
+    //val defaultScore = Scoring.giveAuthorDefaultScore(groupedAuthors.map(x => x._1), spark).toDF("_id", "score")
+    //val scoreAfterSources = Scoring.reduceScoreByAmountOfLinks(defaultScore, amountSourceDF, spark)
+    //val scoreAfterAmountOfArticles = Scoring.reduceByAmountOfArticles(scoreAfterSources, amountOfArticles, spark)
 
 
     // joining Dataframes
@@ -58,13 +84,10 @@ object App {
     val joinedPublishedWebsite = joinDataFrames(daysPublished, perWebsiteDF)
     val joinedPublishedDepartment = joinDataFrames(joinedPublishedWebsite, perDepartmentDF)
     val joinedSourcePublished = joinDataFrames(joinedPublishedDepartment, amountSourceDF)
-    val joinedScorePublished = joinDataFrames(scoreAfterAmountOfArticles, joinedSourcePublished)
-    val fullDataFrame = joinDataFrames(joinedArticles, joinedScorePublished)
+    //val joinedScorePublished = joinDataFrames(scoreAfterAmountOfArticles, joinedSourcePublished)
+    val fullDataFrame = joinDataFrames(joinedArticles, joinedSourcePublished)
 
     // save to MongoDB
     DBConnector.writeToDB(fullDataFrame, writeConfig = writeConfig)
-
-
   }
-
 }
