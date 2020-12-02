@@ -74,9 +74,9 @@ object App {
 
 
     // Trust score for authors
-    //val defaultScore = Scoring.giveAuthorDefaultScore(groupedAuthors.map(x => x._1), spark).toDF("_id", "score")
-    //val scoreAfterSources = Scoring.reduceScoreByAmountOfLinks(defaultScore, amountSourceDF, spark)
-    //val scoreAfterAmountOfArticles = Scoring.reduceByAmountOfArticles(scoreAfterSources, amountOfArticles, spark)
+    val defaultScore = Scoring.giveAuthorDefaultScore(groupedAuthors.map(x => x._1))
+    val scoreAfterSources = Scoring.reduceScoreByAmountOfLinks(defaultScore, amountOfSourcesPerAuthor)
+    val scoreAfterAmountOfArticles = Scoring.reduceByAmountOfArticles(scoreAfterSources, amountOfArticles, spark)
 
 
     // joining Dataframes
@@ -84,8 +84,8 @@ object App {
     val joinedPublishedWebsite = joinDataFrames(daysPublished, perWebsiteDF)
     val joinedPublishedDepartment = joinDataFrames(joinedPublishedWebsite, perDepartmentDF)
     val joinedSourcePublished = joinDataFrames(joinedPublishedDepartment, amountSourceDF)
-    //val joinedScorePublished = joinDataFrames(scoreAfterAmountOfArticles, joinedSourcePublished)
-    val fullDataFrame = joinDataFrames(joinedArticles, joinedSourcePublished)
+    val joinedScorePublished = joinDataFrames(scoreAfterAmountOfArticles, joinedSourcePublished)
+    val fullDataFrame = joinDataFrames(joinedArticles, joinedScorePublished)
 
     // save to MongoDB
     DBConnector.writeToDB(fullDataFrame, writeConfig = writeConfig)

@@ -68,7 +68,7 @@ object Authors {
   */
 
   def articlesPerDepartment(data: RDD[(String, (String, Any, String, List[String], List[String]))]): RDD[(String, Map[String, Int])] = {
-    data.mapValues(_._5).groupByKey().map(x => (x._1, x._2.flatten.map(y => (y, x._2.flatten.count(_ == y))).toMap))
+    data.mapValues(_._5).groupByKey().mapValues(x => x.flatten.map(y => (y, x.flatten.count(_ == y))).toMap)
   }
 
 
