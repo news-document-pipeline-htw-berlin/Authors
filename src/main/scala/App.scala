@@ -62,7 +62,7 @@ object App {
     val averageWordsPerArticle = Authors.averageWordsPerArticleRDD(groupedAuthors)
     val amountOfArticles = Authors.amountOfArticlesPerAuthor(groupedAuthors)
     val perDepartment = Authors.articlesPerDepartment(groupedAuthors)
-
+    val lastTexts = Authors.lastNTexts(groupedAuthors,5)
 
     // Creation of Dataframes
     val articles = spark.createDataFrame(amountOfArticles.collect()).toDF("_id", "articles")
@@ -71,6 +71,7 @@ object App {
     val perWebsiteDF = spark.createDataFrame(perWebsite.collect()).toDF("_id", "perWebsite")
     val perDepartmentDF = spark.createDataFrame(perDepartment.collect()).toDF("_id", "perDepartment")
     val amountSourceDF = spark.createDataFrame(amountOfSourcesPerAuthor.collect()).toDF("_id", "avgAmountOfSources")
+    val lastTextsDF = spark.createDataFrame(lastTexts).toDF("_id", "lastTexts")
 
 
     // Trust score for authors
@@ -85,9 +86,11 @@ object App {
     val joinedPublishedDepartment = joinDataFrames(joinedPublishedWebsite, perDepartmentDF)
     val joinedSourcePublished = joinDataFrames(joinedPublishedDepartment, amountSourceDF)
     val joinedScorePublished = joinDataFrames(scoreAfterAmountOfArticles, joinedSourcePublished)
-    val fullDataFrame = joinDataFrames(joinedArticles, joinedScorePublished)
-
+    val joinedLastTexts = joinDataFrames(joinedScorePublished,lastTextsDF)
+    val fullDataFrame = joinDataFrames(joinedArticles, joinedLastTexts)
     // save to MongoDB
     DBConnector.writeToDB(fullDataFrame, writeConfig = writeConfig)
+
+
   }
 }

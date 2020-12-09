@@ -1,6 +1,7 @@
 package authorMapping
 
-import java.text.SimpleDateFormat
+import java.time.format.TextStyle
+import java.time.{Instant, OffsetDateTime, ZoneId}
 import java.util.Locale
 
 import org.apache.spark.rdd.RDD
@@ -10,13 +11,16 @@ import scala.collection.mutable
 
 object Authors {
 
+  val split_regex = "\\W+"
+
+
   /*
    Aggregates every entry to a Map with (key,value) => (Author, (Text,Date,Website,NewsSite,Links,Departments))
    If no published date is provided, crawl time will be used instead
   */
 
-  def groupByAuthorRDDRow(data: RDD[Row]): RDD[(String, (String, Any, String, List[String], List[String]))] = {
-    data.flatMap(x => x.getAs[mutable.WrappedArray[String]](1).toList.map(y => (y, (x.getString(15), if (x.get(13) != null) x.get(13) else x.get(2), x.getString(12),
+  def groupByAuthorRDDRow(data: RDD[Row]): RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String]))] = {
+    data.flatMap(x => x.getAs[mutable.WrappedArray[String]](1).toList.map(y => (y, (x.getString(15), if (x.get(13) != null) x.getTimestamp(13) else x.getTimestamp(2), x.getString(12),
       x.getAs[mutable.WrappedArray[String]](9).toList, x.getAs[mutable.WrappedArray[String]](3).toList))))
   }
 
@@ -26,7 +30,7 @@ object Authors {
    e.g. (Anna Krueger, 20)
   */
 
-  def amountOfArticlesPerAuthor(data: RDD[(String, (String, Any, String, List[String], List[String]))]): RDD[(String, Int)] = {
+  def amountOfArticlesPerAuthor(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String]))]): RDD[(String, Int)] = {
     data.map(x => (x._1, 1)).reduceByKey(_ + _)
   }
 
@@ -35,8 +39,8 @@ object Authors {
    e.g Map (Anna Krueger -> 306.66)
   */
 
-  def averageWordsPerArticleRDD(data: RDD[(String, (String, Any, String, List[String], List[String]))]): RDD[(String, Double)] = {
-    data.mapValues(x => (x._1.replace(",", "").split(" ").length.toDouble, 1.0)).reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).map(x => (x._1, x._2._1 / x._2._2))
+  def averageWordsPerArticleRDD(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String]))]): RDD[(String, Double)] = {
+    data.mapValues(x => (x._1.replace(",", "").split(split_regex).length.toDouble, 1.0)).reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).map(x => (x._1, x._2._1 / x._2._2))
   }
 
   /*
@@ -44,7 +48,7 @@ object Authors {
    e.g Map[Anna Krueger -> 1.61]
   */
 
-  def averageSourcesPerAuthor(data: RDD[(String, (String, Any, String, List[String], List[String]))]): RDD[(String, Double)] = {
+  def averageSourcesPerAuthor(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String]))]): RDD[(String, Double)] = {
     data.mapValues(x => (x._4.size, 1.0)).reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).mapValues(y => y._1 / y._2)
   }
 
@@ -53,13 +57,9 @@ object Authors {
   Maps every Author to another Map with (key,value) => (Day the article was published, amount of times an article was published on this day)
   e.g. Map[Anna Krueger -> Map(Thu -> 2, Fri -> 5)]
  */
-
-  def publishedOnDayRDD(data: RDD[(String, (String, Any, String, List[String], List[String]))]): RDD[(String, Map[String, Int])] = {
-    val formatter = new SimpleDateFormat("EEEE", Locale.ENGLISH)
-    val parser = new SimpleDateFormat("yyyy-MM-dd")
-
-    val x = data.mapValues(x => x._2).groupByKey().map(x => (x._1, x._2.toList.map(x => if (x != null) formatter.format(parser.parse(x.toString)) else "null")))
-    x.map(x => (x._1, x._2.map(y => (y, x._2.count(_ == y))).toMap))
+  def publishedOnDayRDD(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String]))]): RDD[(String, Array[(String, Int)])] = {
+    val x = data.mapValues(x => x._2).groupByKey().map(x => (x._1, x._2.toList.map(x => OffsetDateTime.ofInstant(Instant.ofEpochMilli(x.getTime), ZoneId.of("Z")).getDayOfWeek)))
+    x.map(x => (x._1, x._2.map(y => (y.getValue, y, x._2.count(_ == y))).sortBy(x => x._1).map(x => (x._2.getDisplayName(TextStyle.FULL, Locale.ENGLISH), x._3)).distinct.toArray))
   }
 
   /*
@@ -67,8 +67,8 @@ object Authors {
    e.g. Map[Anna Krueger -> Map(Wissen -> 25, Reisen -> 2)]
   */
 
-  def articlesPerDepartment(data: RDD[(String, (String, Any, String, List[String], List[String]))]): RDD[(String, Map[String, Int])] = {
-    data.mapValues(_._5).groupByKey().mapValues(x => x.flatten.map(y => (y, x.flatten.count(_ == y))).toMap)
+  def articlesPerDepartment(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String]))]): RDD[(String, Array[(String, Int)])] = {
+    data.mapValues(_._5).groupByKey().map(x => (x._1, x._2.flatten.map(y => (y, x._2.flatten.count(_ == y))).toArray.distinct))
   }
 
 
@@ -77,7 +77,13 @@ object Authors {
    e.g. Map(Anna Krueger -> Map(sz -> 22, taz -> 3))
   */
 
-  def amountOfArticlesByWebsiteRDD(data: RDD[(String, (String, Any, String, List[String], List[String]))]): RDD[(String, Map[String, Double])] = {
+  def amountOfArticlesByWebsiteRDD(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String]))]): RDD[(String, Map[String, Double])] = {
     data.mapValues(x => x._3).groupByKey().map(x => (x._1, x._2.toList.map(y => (y, x._2.count(_ == y).toDouble)).toMap))
   }
+
+  def lastNTexts(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String]))], amount: Int): RDD[(String, Array[(String, Int)])] = {
+    data.mapValues(x => (x._1.replace(",", "").split(split_regex).length, OffsetDateTime.ofInstant(Instant.ofEpochMilli(x._2.getTime), ZoneId.of("Z"))))
+      .mapValues(_.swap).groupByKey().mapValues(x => x.toList.sortBy(_._1).takeRight(amount).map(x => (x._1.toLocalDate.toString, x._2)).toArray)
+  }
+
 }
