@@ -1,10 +1,9 @@
 package scala
 
-import org.scalatest.FunSuite
-
 import authorMapping.Authors._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
+import org.scalatest.FunSuite
 
 
 class AuthorsTest extends FunSuite {
@@ -45,21 +44,21 @@ class AuthorsTest extends FunSuite {
   }
 
   test("Average Words per Article") {
-    val result = averageWordsPerArticleRDD(data).collect().sortBy(_._2).reverse
+    val result = averageWordsPerArticle(data).collect().sortBy(_._2).reverse
     println(result.mkString("Array(", ", ", ")"))
     assert(result.sameElements(Array(("Lennart", 14.333333333333334), ("Malte", 10.5), ("Steven", 9.5), ("Hendrik", 5.0))))
     //Lennart, 13,666666667
   }
 
   test("Published on Day") {
-    val realResult = amountOfArticlesPerDay(data).collect()
+    val realResult = totalArticlesPerDay(data).collect()
     val projectedResult = Array(("Malte", Array(("Thursday", 2))), ("Hendrik", Array(("Monday", 1))), ("Lennart", Array(("Wednesday", 1), ("Thursday", 2))), ("Steven", Array(("Tuesday", 2), ("Thursday", 2))))
     assert(realResult.map(x => x._1) === projectedResult.map(x => x._1))
     assert(realResult.map(_._2) === projectedResult.map(_._2))
   }
 
   test("Articles per Department") {
-    val realResult = amountOfArticlesPerDepartment(data).collect()
+    val realResult = totalArticlesPerDepartment(data).collect()
 
     val projectedResult = Array(("Malte", Array(("IT", 2))), ("Hendrik", Array(("IT", 1))), ("Lennart", Array(("Wissen", 2), ("Politik", 1), ("Nice to know", 1))), ("Steven", Array(("Politik", 1), ("Gaming", 2), ("Unnützes Wissen", 2))))
 
@@ -83,7 +82,7 @@ class AuthorsTest extends FunSuite {
   }
 
   test("Articles per Website") {
-    val realResult = amountOfArticlesByWebsiteRDD(data).collect().sortBy(_._2.values).reverse
+    val realResult = totalArticlesPerWebsite(data).collect().sortBy(_._2.values).reverse
     val projectedResult = List(("Steven", Map("htw" -> 4)), ("Lennart", Map("htw" -> 3)), ("Malte", Map("htw" -> 2)), ("Hendrik", Map("htw" -> 1)))
 
     assert(realResult.map(_._1) === projectedResult.map(_._1))

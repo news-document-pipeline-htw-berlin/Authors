@@ -19,7 +19,7 @@ object Authors {
    If no published date is provided, crawl time will be used instead
   */
 
-  def groupByAuthorRDDRow(data: RDD[Row]): RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String], Double))] = {
+  def groupByAuthor(data: RDD[Row]): RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String], Double))] = {
     data.flatMap(x => x.getAs[mutable.WrappedArray[String]](1).toList.map(y => (y, (x.getString(15), if (x.get(13) != null) x.getTimestamp(13) else x.getTimestamp(2), x.getString(12),
       x.getAs[mutable.WrappedArray[String]](9).toList, x.getAs[mutable.WrappedArray[String]](3).toList, x.getString(17).toDouble))))
   }
@@ -39,7 +39,7 @@ object Authors {
    e.g Map (Anna Krueger -> 306.66)
   */
 
-  def averageWordsPerArticleRDD(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String], Double))]): RDD[(String, Double)] = {
+  def averageWordsPerArticle(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String], Double))]): RDD[(String, Double)] = {
     data.mapValues(x => (x._1.replace(",", "").split(" ").length.toDouble, 1.0)).reduceByKey((x, y) => (x._1 + y._1, x._2 + y._2)).map(x => (x._1, x._2._1 / x._2._2))
   }
 
@@ -59,7 +59,7 @@ object Authors {
   Days are ordered from Monday to Sunday
  */
 
-  def amountOfArticlesPerDay(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String], Double))]): RDD[(String, Array[(String, Int)])] = {
+  def totalArticlesPerDay(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String], Double))]): RDD[(String, Array[(String, Int)])] = {
     val x = data.mapValues(x => x._2).groupByKey().map(x => (x._1, x._2.toList.map(x => OffsetDateTime.ofInstant(Instant.ofEpochMilli(x.getTime), ZoneId.of("Z")).getDayOfWeek)))
     x.map(x => (x._1, x._2.map(y => (y.getValue, y, x._2.count(_ == y))).sortBy(x => x._1).map(x => (x._2.getDisplayName(TextStyle.FULL, Locale.ENGLISH), x._3)).distinct.toArray))
   }
@@ -69,7 +69,7 @@ object Authors {
    e.g. RDD[(Anna Krueger, Array((Wissen,2), (Reisen, 5)))]
   */
 
-  def amountOfArticlesPerDepartment(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String], Double))]): RDD[(String, Array[(String, Int)])] = {
+  def totalArticlesPerDepartment(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String], Double))]): RDD[(String, Array[(String, Int)])] = {
     data.mapValues(_._5).groupByKey().map(x => (x._1, x._2.flatten.map(y => (y, x._2.flatten.count(_ == y))).toArray.distinct))
   }
 
@@ -89,7 +89,7 @@ object Authors {
    */
 
   def avgSentimentPerDay(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String], Double))]): RDD[(String, Array[(String, Double)])] = {
-    val x = data.mapValues(x => (x._2, x._6)).groupByKey().mapValues(x => (x.map(y => (OffsetDateTime.ofInstant(Instant.ofEpochMilli(y._1.getTime), ZoneId.of("Z")).getDayOfWeek, y._2))))
+    val x = data.mapValues(x => (x._2, x._6)).groupByKey().mapValues(x => x.map(y => (OffsetDateTime.ofInstant(Instant.ofEpochMilli(y._1.getTime), ZoneId.of("Z")).getDayOfWeek, y._2)))
     x.mapValues(z => z.groupBy(_._1).map(y => (y._1.getValue, y._1.getDisplayName(TextStyle.FULL, Locale.ENGLISH), y._2.map(f => f._2).map(z => z).sum / y._2.size)).toArray.sortBy(_._1).map(x => (x._2, x._3)).distinct)
 
   }
@@ -100,7 +100,7 @@ object Authors {
    e.g. Map(Anna Krueger -> Map(sz -> 22, taz -> 3))
   */
 
-  def amountOfArticlesByWebsiteRDD(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String], Double))]): RDD[(String, Map[String, Double])] = {
+  def totalArticlesPerWebsite(data: RDD[(String, (String, java.sql.Timestamp, String, List[String], List[String], Double))]): RDD[(String, Map[String, Double])] = {
     data.mapValues(x => x._3).groupByKey().map(x => (x._1, x._2.toList.map(y => (y, x._2.count(_ == y).toDouble)).toMap))
   }
 

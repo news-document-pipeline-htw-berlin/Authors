@@ -36,12 +36,12 @@ object App {
 
   def main(args: Array[String]): Unit = {
 
-    val inputMap = getConnectionInfoFromFile("src/main/resources/inputDBSettings")
+    val articleInputMap = getConnectionInfoFromFile("src/main/resources/inputDBSettings")
     val outputMap = getConnectionInfoFromFile("src/main/resources/outputDBSettings")
 
-    val inputUri = DBConnector.createUri(inputMap.getOrElse("inputUri", throw new IllegalArgumentException),
-      inputMap.getOrElse("inputDB", throw new IllegalArgumentException),
-      inputMap.getOrElse("inputCollection", throw new IllegalArgumentException))
+    val articleInputUri = DBConnector.createUri(articleInputMap.getOrElse("inputUri", throw new IllegalArgumentException),
+      articleInputMap.getOrElse("inputDB", throw new IllegalArgumentException),
+      articleInputMap.getOrElse("inputCollection", throw new IllegalArgumentException))
 
     val outputUri = DBConnector.createUri(outputMap.getOrElse("outputUri", throw new IllegalArgumentException),
       outputMap.getOrElse("outputDB", throw new IllegalArgumentException),
@@ -51,28 +51,29 @@ object App {
     val spark = SparkSession.builder()
       .master("local[4]")
       .appName("Author analysis")
-      .config("spark.mongodb.input.uri", inputUri)
+      .config("spark.mongodb.input.uri", articleInputUri)
       .config("spark.mongodb.output.uri", outputUri)
       .getOrCreate()
 
-    val readConfig = DBConnector.createReadConfig(inputUri)
+    val articleReadConfig = DBConnector.createReadConfig(articleInputUri)
+    val nlpReadConfig = DBConnector.createReadConfig(DBConnector.createUri("127.0.0.1", "input", "nlp"))
     val writeConfig = DBConnector.createWriteConfig(outputUri)
-    val rConfig = DBConnector.createReadConfig(DBConnector.createUri("127.0.0.1", "nlp", "test"))
 
-    val mongoData = DBConnector.readFromDB(sparkSession = spark, readConfig = readConfig)
-    val nlpData = DBConnector.readFromDB(sparkSession = spark, readConfig = rConfig).drop("StopWordsCleaner", "document", "entities", "embeddings", "lemmatizer", "ner", "normalized", "sentence", "text", "token")
+    // Reading Data from MongoDb
+    val mongoData = DBConnector.readFromDB(sparkSession = spark, readConfig = articleReadConfig)
+    val nlpData = DBConnector.readFromDB(sparkSession = spark, readConfig = nlpReadConfig).drop("StopWordsCleaner", "document", "entities", "embeddings", "lemmatizer", "ner", "normalized", "sentence", "text", "token")
 
     // Have to cast objectID to String because of NLP DB
     val mergedData = joinDataFrames(mongoData.withColumn("_id", col("_id").cast(StringType)), nlpData)
 
     // Mapping elements
-    val groupedAuthors = Authors.groupByAuthorRDDRow(mergedData.rdd)
+    val groupedAuthors = Authors.groupByAuthor(mergedData.rdd)
     val amountOfSourcesPerAuthor = Authors.averageSourcesPerAuthor(groupedAuthors)
-    val publishedOnDay = Authors.amountOfArticlesPerDay(groupedAuthors)
-    val perWebsite = Authors.amountOfArticlesByWebsiteRDD(groupedAuthors)
-    val averageWordsPerArticle = Authors.averageWordsPerArticleRDD(groupedAuthors)
+    val publishedOnDay = Authors.totalArticlesPerDay(groupedAuthors)
+    val perWebsite = Authors.totalArticlesPerWebsite(groupedAuthors)
+    val averageWordsPerArticle = Authors.averageWordsPerArticle(groupedAuthors)
     val amountOfArticles = Authors.amountOfArticlesPerAuthor(groupedAuthors)
-    val perDepartment = Authors.amountOfArticlesPerDepartment(groupedAuthors)
+    val perDepartment = Authors.totalArticlesPerDepartment(groupedAuthors)
     val lastTexts = Authors.lastNTexts(groupedAuthors, 5)
     val sentimentPerCategory = Authors.avgSentimentPerDepartment(groupedAuthors)
     val sentimentPerDay = Authors.avgSentimentPerDay(groupedAuthors)
@@ -95,6 +96,7 @@ object App {
 
 
     //joining Dataframes
+    // todo : maybe better way to do this with current architecture?
     val joinedArticles = joinDataFrames(articles, averageWords)
     val joinedPublishedWebsite = joinDataFrames(daysPublished, perWebsiteDF)
     val joinedPublishedDepartment = joinDataFrames(joinedPublishedWebsite, perDepartmentDF)
