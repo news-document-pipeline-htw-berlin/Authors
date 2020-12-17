@@ -23,16 +23,16 @@ object DBConnector {
     Creates a config for reading a MongoDB
    */
 
-  def createReadConfig(inputUri: String, sparkSession: SparkSession): ReadConfig = {
-    ReadConfig(Map("spark.mongodb.input.uri" -> inputUri, "readPreference.name" -> "secondaryPreferred"), Some(ReadConfig(sparkSession)))
+  def createReadConfig(inputUri: String): ReadConfig = {
+    ReadConfig(Map("spark.mongodb.input.uri" -> inputUri, "readPreference.name" -> "secondaryPreferred"))
   }
 
   /*
     Creates a config for writing in db, standard mode is overwrite, meaning DB gets dumped and rewritten as given Dataframe
    */
 
-  def createWriteConfig(outputUri: String, replaceDocument: String = "false", mode: String = "overwrite", sparkSession: SparkSession): WriteConfig = {
-    WriteConfig(Map("spark.mongodb.output.uri" -> outputUri, "replaceDocument" -> replaceDocument, "mode" -> mode), Some(WriteConfig(sparkSession)))
+  def createWriteConfig(outputUri: String, replaceDocument: String = "false", mode: String = "overwrite"): WriteConfig = {
+    WriteConfig(Map("spark.mongodb.output.uri" -> outputUri, "replaceDocument" -> replaceDocument, "mode" -> mode))
 
   }
 
@@ -40,12 +40,12 @@ object DBConnector {
     Reads the MongoDB specified in readConfig and returns it as RDD[Row]
    */
 
-  def readFromDB(sparkSession: SparkSession, readConfig: ReadConfig): RDD[Row] = {
-    val rdd = MongoSpark.load(sparkSession, readConfig).rdd
-    if (rdd.isEmpty())
-      throw new IllegalArgumentException("Empty DB")
-    else
-      rdd
+  def readFromDB(sparkSession: SparkSession, readConfig: ReadConfig): DataFrame = {
+    val df = MongoSpark.load(sparkSession, readConfig)
+    if (df.head(1).isEmpty) {
+      throw new IllegalArgumentException("Provided Empty DB")
+    }
+    df
   }
 
   /*
