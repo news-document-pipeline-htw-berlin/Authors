@@ -1,4 +1,4 @@
-# Prerequisite
+# Prerequisites
 + Java 8
 + MongoDB
 + Scala 2.12.7
@@ -12,6 +12,7 @@
 > sbt run
 
 # Input MongooDB Structure
+
 
 | 0    |    _id  |                    
 | ---- | ---- |
@@ -48,3 +49,4 @@
 | 8    |  sentimentPerDay    | list |
 | 9    |  sentimentPerDepartment    | list |
 | 10   |  wordCountOfLastTexts    | list |
+
