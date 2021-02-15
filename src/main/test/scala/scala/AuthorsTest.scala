@@ -1,4 +1,3 @@
-package scala
 
 import authorMapping.Authors._
 import org.apache.spark.rdd.RDD
@@ -47,7 +46,6 @@ class AuthorsTest extends FunSuite {
     val result = averageWordsPerArticle(data).collect().sortBy(_._2).reverse
     println(result.mkString("Array(", ", ", ")"))
     assert(result.sameElements(Array(("Lennart", 14.333333333333334), ("Malte", 10.5), ("Steven", 9.5), ("Hendrik", 5.0))))
-    //Lennart, 13,666666667
   }
 
   test("Published on Day") {
